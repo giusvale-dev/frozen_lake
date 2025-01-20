@@ -34,58 +34,6 @@ def epsilon_greedy(env, epsilon, q_table, state):
         action = np.argmax(q_table[state,:]) # Exploit: best action
     return action
 
-def decay_rate(init_epsilon: float, epsilon_min: float, total_episodes: int) -> float:
-    if epsilon_min >= init_epsilon:
-        raise Exception("epsilon_min must be < init_epsilon")
-    if total_episodes <= 0 or epsilon_min <= 0 or init_epsilon <=0:
-        raise Exception("The input parameters must be >= 0")
-    # Compute the decay rate
-    k = (init_epsilon - epsilon_min) / total_episodes
-    return k
-
-def decrement_epsilon(epsilon: float, epsilon_min: float, decay_rate:float, episode_step: int) -> float:
-    return max(epsilon_min, epsilon - (decay_rate * episode_step))
-
-
-def deterministic_training(discount_factor, epsilon, episodes):
-    
-    env = gym.make('FrozenLake-v1', map_name="8x8", is_slippery=False, render_mode=None)
-    q = np.zeros((env.observation_space.n, env.action_space.n)) # Zeroize the Q-Table (8x8x4)
-    rewards_per_episodes = np.zeros(episodes)
-
-   # k = decay_rate(epsilon, 0.01, episodes)
-    learning_rate = 0.1
-
-    for i in range(episodes):
-        state = env.reset()[0]  # states: 0 to 63
-        terminated = False      # True when agent goes in hole or reached goal
-        truncated = False       # True when actions > 200 (value given by documentation)
-        while(not terminated and not truncated):
-
-            action = epsilon_greedy(env, epsilon, q, state)
-            
-            new_state,reward,terminated,truncated,_ = env.step(action) # execute the action
-           
-            #q[state, action] = reward + discount_factor * np.max(q[new_state,:])
-            # Update the Q-value using the Q-learning rule
-            q[state, action] = q[state, action] + learning_rate * (
-                reward + discount_factor * np.max(q[new_state, :]) - q[state, action]
-            )
-            # Set the new state
-            state = new_state
-
-        # Keep trace of rewards for episode
-        if reward == 1:
-            print("YESSSSSSSSS")
-            rewards_per_episodes[i] = 1
-        
-        # Linear decay
-    #    epsilon = decrement_epsilon(epsilon, 0.01, k, i)
-    
-    # Episode ends, close the environment
-    env.close()
-    return q, rewards_per_episodes
-
 def q_learning_deterministic(number_episodes, epsilon=0.95, discount_factor=1, learning_rate = 0.1):
     env = gym.make('FrozenLake-v1', map_name="8x8", is_slippery=False, render_mode=None)
     q = np.zeros((env.observation_space.n, env.action_space.n)) # Zeroize the Q-Table (8x8x4)
@@ -121,25 +69,69 @@ def q_learning_deterministic(number_episodes, epsilon=0.95, discount_factor=1, l
     
     return q, rewards_per_episodes, policy
 
-def use_deterministic_learning(policy, number_episodes):
-    env = gym.make('FrozenLake-v1', map_name="8x8", is_slippery=False, render_mode="human")
+def q_learning_non_deterministic(number_episodes, epsilon=0.95, discount_factor=1, learning_rate = 0.1):
+    env = gym.make('FrozenLake-v1', map_name="8x8", is_slippery=True, render_mode=None)
+    q = np.zeros((env.observation_space.n, env.action_space.n)) # Zeroize the Q-Table (8x8x4)
+    rewards_per_episodes = np.zeros(number_episodes)
+    for i in range(number_episodes):
+        state = env.reset()[0]
+        terminated = False      # True when agent goes in hole or reached goal
+        truncated = False       # True when actions > 200 (value given by documentation)
+        while(not terminated and not truncated):
+
+            action = epsilon_greedy(env, epsilon, q, state) # Choose an action with epsilon-greedy strategy
+        
+            new_state,reward,terminated,truncated,_ = env.step(action) # Execute and observe the action
+           
+           # Update the Q-value using the Q-learning rule
+            q[state, action] = q[state, action] + learning_rate * (
+                reward + discount_factor * np.max(q[new_state, :]) - q[state, action]
+            )
+         
+            # Set the new state
+            state = new_state
+
+        # Keep trace of rewards for episode
+        if reward == 1:
+            rewards_per_episodes[i] = 1
+        
+    # Derive policy from Q-Values
+    policy = {s: np.argmax(q[s]) for s in range (env.observation_space.n)}
+
+    # Episode ends, close the environment
+    env.close()
+    
+    return q, rewards_per_episodes, policy
+
+def run_agent(policy, number_episodes: int, deterministic: bool, render: bool):
+    env = gym.make('FrozenLake-v1', map_name="8x8", is_slippery=False if deterministic else True, render_mode="human" if render else None)
     total_reward = 0
+    win_counts = []
+    loss_counts = []
     for i in range(number_episodes):
         
         state = env.reset()[0]  # states: 0 to 63
         terminated = False      # True when agent goes in hole or reached goal
-        truncated = False       # True when actions > 200 (value given by documentation)
-        
-        while(not terminated and not truncated):
+        win = False
+
+        while(not terminated):
             action = policy[state]
-            new_state, reward, terminated, truncated,_ = env.step(action) # execute the action
+            new_state, reward, terminated, _, _ = env.step(action) # execute the action
             state = new_state
         
         total_reward+=reward
+
+        if reward > 0:
+            win_counts.append(1)
+            loss_counts.append(0)
+        else:
+            win_counts.append(0)
+            loss_counts.append(1)
+
             
     # Episode ends, close the environment
     env.close()
-    return total_reward
+    return total_reward, win_counts, loss_counts
 
 
 def cumulative_rewards_chart(categories: List, values: List, title: str, xlabel: str, ylabel: str, file_name="cumulative_rewards.png"):
@@ -170,62 +162,110 @@ def bar_chart(categories: List, values: List, title: str, xlabel: str, ylabel: s
     plt.ylabel(ylabel)
     plt.savefig(file_name + ".png")
 
-def epsilon_analysis():
+def epsilon_analysis(deterministic: bool):
 
     categories = ["\u03B5=1", "\u03B5=0.99", "\u03B5=0.95", "\u03B5=0.5"]
-    values = []
     reward_list = []
     
-    q, rewards, policy = q_learning_deterministic(10000, 1, 1, 0.01)
-    reward_list.append(rewards)
+    if deterministic:
+        q, rewards, policy = q_learning_deterministic(15000, 1, 1, 0.1)
+        reward_list.append(rewards)
 
-    q, rewards, policy = q_learning_deterministic(10000, 0.99, 1, 0.01)
-    reward_list.append(rewards)
+        q, rewards, policy = q_learning_deterministic(15000, 0.99, 1, 0.1)
+        reward_list.append(rewards)
 
-    q, rewards, policy = q_learning_deterministic(10000, 0.95, 1, 0.01)
-    reward_list.append(rewards)
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 1, 0.1)
+        reward_list.append(rewards)
 
-    q, rewards, policy = q_learning_deterministic(10000, 0.5, 1, 0.01)
-    reward_list.append(rewards)
+        q, rewards, policy = q_learning_deterministic(15000, 0.5, 1, 0.1)
+        reward_list.append(rewards)
 
-    cumulative_rewards_chart(values=reward_list, categories=categories, xlabel="Episodes", ylabel="Cumulative Reward ", title="Cumulative Reward Over Time (Episodes) \u03B3=1 \u03B1=0.01", file_name="epsilon_deterministic_analysis")
+        cumulative_rewards_chart(values=reward_list, categories=categories, xlabel="Episodes", ylabel="Cumulative Reward ", title="Cumulative Reward Over Time (Episodes) Deterministic Environment \u03B3=1 \u03B1=0.1", file_name="epsilon_deterministic_analysis.png")
+    else:
+        q, rewards, policy = q_learning_non_deterministic(15000, 1, 1, 0.1)
+        reward_list.append(rewards)
 
-def learning_rate_analysis():
+        q, rewards, policy = q_learning_non_deterministic(15000, 0.99, 1, 0.1)
+        reward_list.append(rewards)
+
+        q, rewards, policy = q_learning_non_deterministic(15000, 0.95, 1, 0.1)
+        reward_list.append(rewards)
+
+        q, rewards, policy = q_learning_non_deterministic(15000, 0.5, 1, 0.1)
+        reward_list.append(rewards)
+
+        cumulative_rewards_chart(values=reward_list, categories=categories, xlabel="Episodes", ylabel="Cumulative Reward ", title="Cumulative Reward Over Time (Episodes) Non-Deterministic Environment \u03B3=1 \u03B1=0.1", file_name="epsilon_non_deterministic_analysis.png")
+
+
+def learning_rate_analysis(deterministic: bool):
 
     categories = ["\u03B1=0.5", "\u03B1=0.3", "\u03B1=0.1", "\u03B1=0.01"]
     reward_list = []
-    
-    q, rewards, policy = q_learning_deterministic(10000, 0.95, 1, 0.5)
-    reward_list.append(rewards)
+    if deterministic:
 
-    q, rewards, policy = q_learning_deterministic(10000, 0.95, 1, 0.3)
-    reward_list.append(rewards)
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 1, 0.5)
+        reward_list.append(rewards)
 
-    q, rewards, policy = q_learning_deterministic(10000, 0.95, 1, 0.1)
-    reward_list.append(rewards)
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 1, 0.3)
+        reward_list.append(rewards)
 
-    q, rewards, policy = q_learning_deterministic(10000, 0.95, 1, 0.01)
-    reward_list.append(rewards)
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 1, 0.1)
+        reward_list.append(rewards)
 
-    cumulative_rewards_chart(values=reward_list, categories=categories, xlabel="Episodes", ylabel="Cumulative Reward ", title="Cumulative Reward Over Time (Episodes) \u03B5=0.95 \u03B3=1", file_name="learning_rate_deterministic_analysis")
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 1, 0.01)
+        reward_list.append(rewards)
 
-def discount_factor_analysis():
+        cumulative_rewards_chart(values=reward_list, categories=categories, xlabel="Episodes", ylabel="Cumulative Reward ", title="Cumulative Reward Over Time (Episodes) Deterministic Enironment \u03B5=0.95 \u03B3=1", file_name="learning_rate_deterministic_analysis")
+    else:
+        q, rewards, policy = q_learning_non_deterministic(15000, 0.95, 1, 0.5)
+        reward_list.append(rewards)
+
+        q, rewards, policy = q_learning_non_deterministic(15000, 0.95, 1, 0.3)
+        reward_list.append(rewards)
+
+        q, rewards, policy = q_learning_non_deterministic(15000, 0.95, 1, 0.1)
+        reward_list.append(rewards)
+
+        q, rewards, policy = q_learning_non_deterministic(15000, 0.95, 1, 0.01)
+        reward_list.append(rewards)
+
+        cumulative_rewards_chart(values=reward_list, categories=categories, xlabel="Episodes", ylabel="Cumulative Reward ", title="Cumulative Reward Over Time (Episodes) Non-Deterministic Environment \u03B5=0.95 \u03B3=1", file_name="learning_rate_non_deterministic_analysis")
+
+
+def discount_factor_analysis(deterministic: bool):
     categories = ["\u03B3=1", "\u03B3=0.99", "\u03B3=0.95", "\u03B3=0.7"]
     reward_list = []
     
-    q, rewards, policy = q_learning_deterministic(10000, 0.95, 1, 0.01)
-    reward_list.append(rewards)
-
-    q, rewards, policy = q_learning_deterministic(10000, 0.95, 0.99, 0.01)
-    reward_list.append(rewards)
-
-    q, rewards, policy = q_learning_deterministic(10000, 0.95, 0.95, 0.01)
-    reward_list.append(rewards)
+    if deterministic:
     
-    q, rewards, policy = q_learning_deterministic(10000, 0.95, 0.7, 0.01)
-    reward_list.append(rewards)
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 1, 0.1)
+        reward_list.append(rewards)
 
-    cumulative_rewards_chart(values=reward_list, categories=categories, xlabel="Episodes", ylabel="Cumulative Reward ", title="Cumulative Reward Over Time (Episodes) \u03B5=0.95 \u03B1=0.01", file_name="discount_factor_deterministic_analysis")
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 0.99, 0.1)
+        reward_list.append(rewards)
+
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 0.95, 0.1)
+        reward_list.append(rewards)
+
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 0.7, 0.1)
+        reward_list.append(rewards)
+
+        cumulative_rewards_chart(values=reward_list, categories=categories, xlabel="Episodes", ylabel="Cumulative Reward ", title="Cumulative Reward Over Time (Episodes) Deterministic Environment \u03B5=0.95 \u03B1=0.1", file_name="discount_factor_deterministic_analysis")
+    
+    else:
+        
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 1, 0.01)
+        reward_list.append(rewards)
+
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 0.99, 0.01)
+        reward_list.append(rewards)
+
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 0.95, 0.01)
+        reward_list.append(rewards)
+
+        q, rewards, policy = q_learning_deterministic(15000, 0.95, 0.7, 0.01)
+        reward_list.append(rewards)
+        cumulative_rewards_chart(values=reward_list, categories=categories, xlabel="Episodes", ylabel="Cumulative Reward ", title="Cumulative Reward Over Time (Episodes) Non-Deterministic Environment \u03B5=0.95 \u03B1=0.1", file_name="discount_factor_non_deterministic_analysis")
 
 def heatmap(qtable, file_name:str, title:str, xlabel:str, ylabel:str):
     
@@ -236,11 +276,47 @@ def heatmap(qtable, file_name:str, title:str, xlabel:str, ylabel:str):
     plt.ylabel(ylabel)
     plt.savefig(file_name + ".png")
 
+def plot_win_loss_log(wins, losses):
+    
+    
+    cumulative_wins = np.cumsum(wins)
+    cumulative_losses = np.cumsum(losses)
+    
+    # Plot log of wins and losses (add 1 to avoid log(0) issue)
+    plt.figure(figsize=(10, 6))
+    plt.plot(np.log(cumulative_wins + 1), label='Log(Wins)', color='green', linestyle='-', linewidth=2)
+    plt.plot(np.log(cumulative_losses + 1), label='Log(Losses)', color='red', linestyle='-', linewidth=2)
+    
+    plt.xlabel('Episodes', fontsize=14)
+    plt.ylabel('Log(Count)', fontsize=14)
+    plt.title('Log of Wins and Losses Over Episodes', fontsize=16)
+    plt.legend(loc='upper left')
+    plt.grid(True)
+    plt.savefig("win_loss_log.png")
+
 if __name__ == '__main__':
     #epsilon_analysis()
     #learning_rate_analysis()
     #discount_factor_analysis()
-    q, rewards, policy = q_learning_deterministic(10000)
-    print(use_deterministic_learning(policy, 10))
+    #q, rewards, policy = q_learning_deterministic(10000)
+    #q, rewards, policy = q_learning_non_deterministic(10000)
+    #epsilon_analysis(deterministic=False)
+    #epsilon_analysis(deterministic=True)
+    #print(use_deterministic_learning(policy, 10))
     #heatmap(q, "qtable", "Q-Table", "Actions", "States")
-        
+    #learning_rate_analysis(True)
+    #learning_rate_analysis(False)
+    #epsilon_analysis(True)
+    #epsilon_analysis(False)
+    #discount_factor_analysis(True)
+    #discount_factor_analysis(False)
+    q_deterministic, rewards, policy_deterministic = q_learning_deterministic(15000)
+    q_non_deterministic, rewards, policy_non_deterministic = q_learning_non_deterministic(15000)
+    print("Deterministic result:")
+    print(run_agent(policy_deterministic, 100, True, False)[0])
+
+    
+    total_rewards, wins, losses = run_agent(policy_non_deterministic, 100, False, False)
+    print(f"Non Deterministic result:{total_rewards}")
+    plot_win_loss_log(wins=wins, losses=losses)
+    
