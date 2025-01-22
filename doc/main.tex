@@ -1,0 +1,37 @@
+\documentclass[12pt, a4paper]{report}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb} % Math symbols
+\usepackage{graphicx}         % Include graphics
+\usepackage{hyperref}         % Hyperlinks
+\usepackage{geometry}         % Page layout
+\geometry{margin=1in}         % 1-inch margins
+\usepackage{natbib}           % Bibliography support
+\usepackage{setspace}         % Line spacing
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Title Page Information
+\title{Artificial Intelligence and Machine Learning}
+\author{Giuseppe Valente \\ Sapienza - University of Rome \\ Engineering in Computer Science}
+\date{}
+
+% Begin Document
+\begin{document}
+
+% Title Page
+\maketitle
+
+% Table of Contents
+\tableofcontents
+\newpage
+
+% Chapters
+\include{introduction}
+\include{reinforcement_learning}
+\include{deep_qlearning}
+\include{frozen_lake_project}
+
+\end{document}

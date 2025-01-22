@@ -1,0 +1,97 @@
+\chapter{Reinforcement Learning}
+
+RL is one of three basic machine learning of machine learning concerned with how an agent should take actions in a dynamic environment to maximize a reward. 
+Finding a balance between exploration (of uncharted environment) and exploitation (of current knowledge) with the goal of maximize the cumulative reward. 
+The environment is typically stated in the form of a Markov decision process (MDP).
+The purpose of reinforcement learning is for the agent to learn an optimal policy that maximizes the reward function or other user-provided reinforcement signal that accumulates from immediate rewards.
+\section{Agent's learning task}
+A basic reinforcement learning agent interacts with its environment in discrete time steps. 
+At each time step t, the agent receives the current state $S_t$ and reward $R_t$. 
+It then chooses an action $A_t$ from the set of available actions, which is subsequently sent to the environment. 
+The environment moves to a new state $S_{t+1}$ and the reward $R_{t+1}$ 
+associated with the transition ($S_t$,$A_t$,$S_{t+1}$) is determined. 
+The goal of a reinforcement learning agent is to learn a policy
+
+\section{Q-Function}
+The Q-Function (the state-action) function is a function that helps the agent to decide which action to take in a given state in order to maximize  its expected cumulative reward.
+In general we can write the Q-Function using the Bellman equation:
+\begin{equation}
+Q(s, a) \leftarrow Q(s, a) + \alpha \left( r + \gamma \max_{a'} Q(s', a') - Q(s, a) \right)
+\label{non_deteministic_q_function}
+\end{equation}
+\newline
+\textbf{Q(s, a):} Current estimate of the expected cumulative reward for taking action \(a\) in state \(s\) and following the optimal policy thereafter.
+\newline
+\textbf{Q(s, a):} The current Q-value for the state-action pair \( (s, a) \).
+\newline
+\textbf{\(\alpha\):} The \textit{learning rate}. It controls how much the new information should override the old information. A higher value means the agent will quickly adapt to new experiences.
+\newline
+\textbf{r:} The \textit{immediate reward} received after taking action \(a\) in state \(s\).
+\newline
+\textbf{\(\gamma\):} The \textit{discount factor}. It determines how much the agent values future rewards compared to immediate rewards. A value close to 1 means the agent cares about long-term rewards, while a value close to 0 means the agent prioritizes immediate rewards.
+\newline
+\textbf{\(\max_{a'} Q(s', a')\):} The maximum Q-value over all possible actions \(a'\) in the next state \(s'\). This represents the best expected reward the agent can get from the next state onward.
+\newline
+\textbf{Q(s, a):} The original Q-value before the update, which is updated based on the new experience.
+\newline
+\textbf{\(Q(s, a) \leftarrow \):} The leftward arrow indicates that the Q-value is being updated with the new value on the right side of the equation.
+\section{Deterministic Environment}
+In a \textit{deterministic} environment, the outcome of any action taken by the agent is completely predictable.
+For a given state \( s \) and action \( a \), the next state \( s' \) is always the same. 
+The environment follows strict rules, meaning that there is no randomness involved in the transition from one state to another.
+The reward associated with an action is also deterministic, meaning the agent always receives the same reward for performing the same action in the same state.
+The agent can rely on complete predictability and plan its actions with full certainty about the consequences.
+In deterministic environments, the Q-value can be updated directly based on the immediate reward and the known future reward, so \( \alpha \) isn't needed. 
+Then the update rule for the Q-function is:
+\begin{equation}
+Q(s, a) \leftarrow r + \gamma  Q(s', a')
+\label{deteministic_q_function}
+\end{equation}
+
+\section{Non-deterministic Environment}
+In a \textit{non-deterministic} environment, the outcome of an action is uncertain. For a given state \( s \) and action \( a \), the next state \( s' \) is probabilistic, and the reward \( r \) may vary.
+The Q-function in a non-deterministic environment represents the expected cumulative reward, taking into account the uncertainty in state transitions and rewards. The agent must learn not only the value of taking an action in a given state but also the probability distribution of possible outcomes.
+The update rule is \ref{non_deteministic_q_function}
+tcomes can vary each time the same action is taken in the same state.
+
+\section{Generic Q-Learning algorithm}
+The following is the pseudocode for the Q-learning algorithm using the $\epsilon$-greedy strategy in both deterministic and non-deterministic environments:
+\begin{algorithm}[H]
+\caption{Q-learning Algorithm (with $\epsilon$-greedy)}
+\begin{algorithmic}[1]
+\State \textbf{Input:} Learning rate $\alpha$, discount factor $\gamma$, exploration rate $\epsilon$, number of episodes $N$
+\State \textbf{Initialize:} Q-table $Q(s, a)$ for all states $s$ and actions $a$, set episode count $i = 1$
+\While{$i \leq N$}
+    \State Initialize starting state $s_1$
+    \While{not terminal state $s_t$}
+        \State Choose action $a_t$ based on the $\epsilon$-greedy policy:
+        \If{random number $r \leq \epsilon$}
+            \State Select a random action $a_t$
+        \Else
+            \State Select action $a_t = \arg\max_{a} Q(s_t, a)$ (greedy action)
+        \EndIf
+        \State Take action $a_t$, observe reward $r_t$ and next state $s_{t+1}$
+        \State Update Q-value:
+        \If{deterministic environment}
+            \State $Q(s_t, a_t) \leftarrow r_t + \gamma Q(s_{t+1}, a')$
+        \Else
+            \State $Q(s_t, a_t) \leftarrow Q(s_t, a_t) + \alpha \left( r_t + \gamma \max_{a'} Q(s_{t+1}, a') - Q(s_t, a_t) \right)$
+        \EndIf
+        \State $s_t \leftarrow s_{t+1}$
+    \EndWhile
+    \State $i \leftarrow i + 1$
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+\section{Hyperparameters}
+They are parameters set before the learning process begins, play a crucial role in determining the efficiency and effectiveness of the learning process. 
+
+\begin{itemize}
+    \item \textbf{Learning rate ($\alpha$)}: Controls how much the Q-values are adjusted during each update. A larger learning rate leads to faster updates, but can also result in instability. A smaller learning rate may lead to slower learning.
+    \item \textbf{Discount factor ($\gamma$)}: Determines how much the agent values future rewards compared to immediate rewards. A discount factor close to 1 means the agent values long-term rewards, while a value close to 0 means the agent focuses on immediate rewards.
+    \item \textbf{Exploration rate ($\epsilon$)}: In the $\epsilon$-greedy strategy, this parameter controls the probability with which the agent chooses a random action (exploration) instead of the action with the highest Q-value (exploitation). It helps balance exploration of new actions with exploiting the known best actions.
+    \item \textbf{Number of episodes ($N$)}: Specifies the number of training episodes or iterations over which the agent will interact with the environment and learn. More episodes typically lead to better learning but require more computation time.
+\end{itemize}
+Choosing the right set of hyperparameters is crucial for training an effective model. Poor choices of hyperparameters can lead to slow convergence, overfitting, or even complete failure of the algorithm to learn useful behavior.
+\section{Exploitation and Exploration balance}
+\section{Measure the optimal policy}
