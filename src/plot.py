@@ -247,3 +247,25 @@ def heatmap(qtable, file_name:str, title:str, xlabel:str, ylabel:str):
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.savefig(file_name + ".png")
+
+def success_rate_log(categories: List, values: List, title: str, xlabel: str, ylabel: str, file_name="success_rate_log.png"):
+    alpha_label = '\u03B1'
+    gamma_label = '\u03B3'
+
+    plt.figure(figsize=(10, 6))
+    plt.title(title, fontsize=16)
+    plt.xlabel(xlabel, fontsize=14)
+    plt.ylabel(ylabel, fontsize=14)
+
+    for i in range(len(values)):
+        sum = np.cumsum(values[i])
+        if sum[len(sum) - 1] > 0:
+            plt.plot(np.log10(sum/len(values[i])), label=categories[i], alpha = 0.3)
+        else:
+            sum = [-10] * len(values[i])       
+            plt.plot(sum, label=categories[i], alpha = 0.3)
+    
+    plt.ylim(-20, 5)
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(file_name)
