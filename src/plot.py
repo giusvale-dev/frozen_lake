@@ -35,7 +35,6 @@ def log_gamma_analysis(deterministic: bool, iterations: int):
 
             # Plot            
             plt.plot(log_win_loss_ratio, label=f'"{gamma_label}={gamma}"')
-
           
     else:
         alpha = 0.1  # The agent learn in conservative way 
