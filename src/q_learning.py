@@ -27,9 +27,9 @@ class FrozenLakeNonDeterministic:
         self.episodes_number = episodes_number
         self.learning_rate = learning_rate
 
-    def training(self):
-        env = gym.make('FrozenLake-v1', map_name="4x4", is_slippery=True, render_mode="human" if self.render else None)
-        q = np.zeros((env.observation_space.n, env.action_space.n)) # Zeroize the Q-Table (4x4x4)
+    def training(self, map_name="4x4"):
+        env = gym.make('FrozenLake-v1', map_name=map_name, is_slippery=True, render_mode="human" if self.render else None)
+        q = np.zeros((env.observation_space.n, env.action_space.n)) # Zeroize the Q-Table
         rewards_per_episodes = np.zeros(self.episodes_number)
         epsilon_min = 0.01
         k = 0.00005
@@ -70,21 +70,9 @@ class FrozenLakeNonDeterministic:
 
         return q, rewards_per_episodes, policy
     
-    def run_agent(self, policy):
+    def run_agent(self, policy, map_name="4x4"):
         
-        """
-        Runs the agent using the learned policy.
-
-        Args:
-            policy (dict): A dictionary mapping states to optimal actions.
-
-        Returns:
-            tuple:
-                total_reward (int): Total rewards.
-                win_counts: List of binary values indicating success in each episode.
-                loss_counts: List of binary values indicating failure in each episode.
-        """
-        env = gym.make('FrozenLake-v1', map_name="4x4", is_slippery=True, render_mode="human" if self.render else None)
+        env = gym.make('FrozenLake-v1', map_name=map_name, is_slippery=True, render_mode="human" if self.render else None)
 
         total_reward = 0
         win_counts = []
@@ -114,26 +102,9 @@ class FrozenLakeNonDeterministic:
         return total_reward, win_counts, loss_counts
 
 class FrozenLakeDeterministic:
-    """
-    Class to implement Q-learning for deterministic version of Frozen Lake
-    """
+    
     def __init__(self, epsilon: float, discount_factor: float, render: bool, episodes_number: int):
         
-        """
-        Initializes the FrozenLakeDeterministic object.
-
-        Args:
-            epsilon (float): Exploration probability, must be between 0 and 1.
-            discount_factor (float): Discount factor for future rewards, must be between 0 and 1.
-            render (bool): If True, show the environment UI.
-            episodes_number (int): Number of episodes for training or evaluation.
-
-        Raises:
-            Exception: If epsilon is not between 0 and 1.
-            Exception: If discount_factor is not between 0 and 1.
-            Exception: If episodes_number is less than or equal to 0.
-        """
-
         if epsilon < 0 or epsilon > 1:
             raise Exception("Epsilon must be between 0 and 1")
         
@@ -148,19 +119,9 @@ class FrozenLakeDeterministic:
         self.render = render
         self.episodes_number = episodes_number
         
-    def training(self):
+    def training(self, map_name="4x4"):
         
-        """
-        Trains the agent.
-
-        Returns:
-            tuple:
-                Q: The Q-table containing state-action values.
-                rewards_per_episodes: Array of rewards.
-                policy (dict): The optimal policy derived from the Q-values, mapping states to actions.
-        """
-
-        env = gym.make('FrozenLake-v1', map_name="4x4", is_slippery=False, render_mode=True if self.render else None)
+        env = gym.make('FrozenLake-v1', map_name=map_name, is_slippery=False, render_mode=True if self.render else None)
             
         Q = np.zeros((env.observation_space.n, env.action_space.n))
         rewards_per_episodes = np.zeros(self.episodes_number)
@@ -199,20 +160,9 @@ class FrozenLakeDeterministic:
 
         return Q, rewards_per_episodes, policy
     
-    def run_agent(self, policy):
-        """
-        Runs the agent using the learned policy.
-
-        Args:
-            policy (dict): A dictionary mapping states to optimal actions.
-
-        Returns:
-            tuple:
-                total_rewards: List of rewards obtained in each episode.
-                win_counts: List of binary values indicating success in each episode.
-                loss_counts: List of binary values indicating failure in each episode.
-        """
-        env = gym.make('FrozenLake-v1', map_name="4x4", is_slippery=False, render_mode="human" if self.render else None)
+    def run_agent(self, policy, map_name="4x4"):
+        
+        env = gym.make('FrozenLake-v1', map_name=map_name, is_slippery=False, render_mode="human" if self.render else None)
 
         total_rewards = []
         win_counts = []
@@ -242,24 +192,7 @@ class FrozenLakeDeterministic:
         return total_rewards, win_counts, loss_counts
     
 def epsilon_greedy(env, epsilon, q_table, state):
-    """
-    Perform epsilon-greedy action selection for a given state in a reinforcement learning environment.
-
-    Parameters:
-        env (gym.Env): The environment, which provides the action space.
-        epsilon (float): The probability of choosing a random action (exploration). Should be in the range [0, 1].
-        q_table (numpy.ndarray): A Q-table where q_table[state, action] gives the estimated value of taking the 
-                                  action in the given state.
-        state (int): The current state of the agent, represented as an index corresponding to rows in q_table.
-
-    Returns:
-        int: The selected action to execute in the environment.
-
-    Description:
-        The epsilon-greedy algorithm balances exploration and exploitation:
-        - With probability `epsilon`, it selects a random action from the environment's action space.
-        - With probability `1 - epsilon`, it selects the action with the highest Q-value for the current state.
-    """
+    
     random_number = np.random.default_rng().random()
     if random_number < epsilon:
         action = env.action_space.sample() # Explore: random action

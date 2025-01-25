@@ -103,8 +103,45 @@ They are parameters set before the learning process begins, play a crucial role 
 \end{itemize}
 Choosing the right set of hyperparameters is crucial for training an effective model. Poor choices of hyperparameters can lead to slow convergence, overfitting, or even complete failure of the algorithm to learn useful behavior.
 
-\section{Brief of DQN}
+\section{Brief of Deep Q-Network (DQN)}
 
+One of the main drawbacks of Q-learning is that it becomes infeasible when dealing with large state spaces, 
+as the size of the Q-table grows exponentially with the number of states and actions. In such cases, 
+the algorithm becomes computationally expensive and requires a lot of memory to store the Q-values.
+To solve this problem we can combine Q-Learning with Deep Neural Network.
+The neural network receives the state as an input and outputs the Q-values for all possible actions. 
+The following figure illustrates the difference between Q-learning and deep Q-learning in evaluating the Q-value:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{images/q_learning_dqn.png}
+    \caption{Difference between Q-Learning and DQN in evaluating Q-Values}
+    \label{fig:q_learning_dqn}
+\end{figure}
+Essentially, deep Q-Learning replaces the regular Q-table with the neural network. Rather than mapping a (state, action)
+pair to a Q-value, the neural network maps input states to (action, Q-value) pairs.
+These are the steps of how DQN works:
+\begin{itemize}
+    \item \textbf{Environment:} DQN interacts with an environment with a state, an action space, and a reward function. 
+    The goal of the DQN is to learn the optimal policy that maximizes cumulative rewards over time
+    \item \textbf{Replay Memory:} DQN uses a replay memory buffer to store past experiences. 
+    Each experience is a tuple (state, action, reward, next state) representing a single transition from one state to another. 
+    The replay memory stores these experiences to sample from later randomly
+    \item \textbf{Deep Neural Network:} DQN uses a deep neural network to estimate the Q-values for each (state, action) pair.
+     The neural network takes the state as input and outputs the Q-value for each action. 
+     The network is trained to minimize the difference between the predicted and target Q-values.
+    \item \textbf{Epsilon-greedy:} DQN uses the $\varepsilon$-greedy algorithm to balance exploration and exploitation.
+    \item \textbf{Target Network:} DQN uses a separate target network to estimate the target Q-values. It is a copy of the 
+        main neural network with fixed parameters and it is updated periodically to prevent the overestimation of Q-values.
+    \item \textbf{Training:} DQN trains the neural network using the Bellman equation \ref{non_deteministic_q_function} 
+    to estimate the optimal Q-values.The loss function is the mean squared error (MSE) between the predicted and target values. 
+    The neural network weights are updated using backpropagation and stochastic gradient descent.
+    \item \textbf{Testing:} DQN uses the learned policy to make environmental decisions after training. 
+    The agent selects the action with the highest Q-value for a given state
+\end{itemize}
+In summary, DQN learns the optimal policy by using a deep neural network to estimate the Q-values, 
+a replay memory buffer to store past experiences, and a target network to prevent overestimating Q-values. 
+The agent uses an epsilon-greedy exploration strategy during training and selects the action with the highest Q-value 
+during testing.
 \section{Solving the Deterministic Environment}
 \subsection{Deterministic Environment}
 In a \textit{deterministic} environment, the outcome of any action taken by the agent is completely predictable.
@@ -289,3 +326,229 @@ A very important fact is the agents learned an optimal policy, they do not have 
     \caption{Success rate log}
     \label{fig:success_rate_log_nd}
 \end{figure}
+\section{Solving the Frozen Lake using DQN}
+In our implementation we used the canonical classes:
+\begin{itemize}
+    \item DQN class to represent the DQN implementation
+    \item The ReplayMemory class to store the agent's experiences
+\end{itemize}
+
+\subsection{DQN class details}\label{sec:dqn_class}
+Is very important understand how the DQN class is implemented because it defines the Neural Network architecture.
+For this reason we share the code of the class
+\begin{lstlisting}[caption={DQN Neural Network Implementation}]
+    class DQN(nn.Module):
+        def __init__(self, in_states, h1_nodes, out_actions):
+            super().__init__()
+    
+            self.fc1 = nn.Linear(in_states, h1_nodes)
+            self.out = nn.Linear(h1_nodes, out_actions)
+        def forward(self, x):
+            x = F.relu(self.fc1(x))
+            x = self.out(x)
+            return x
+\end{lstlisting}
+\begin{itemize}
+    \item \textbf{fc1:} Is the first fully connected layer (between the input states and the hidden layer)
+    \item \textbf{out:} Is the second fully connected layer (between the hidden layer and the out actions)
+    \item \textbf{forward():} This method defines the data flow through the network. This is how the network processes input data to produce an output.
+    \item \textbf{\texttt{self.fc1(x)}}:
+    \begin{itemize}
+        \item The input $\mathbf{x}$ is passed through the first fully connected layer (\texttt{fc1}).
+        \item The layer performs a linear transformation:
+        \[
+        \mathbf{x}_{\text{out}} = \mathbf{x}_{\text{in}} \cdot \mathbf{W}^T + \mathbf{b},
+        \]
+        where:
+        \begin{itemize}
+            \item $\mathbf{x}_{\text{in}}$ is the input vector,
+            \item $\mathbf{W}$ is the weight matrix of the layer
+            \item $\mathbf{b}$ is the bias term.
+        \end{itemize}
+    \end{itemize}
+
+    \item \textbf{\texttt{F.relu(...)}}:
+    \begin{itemize}
+        \item The output from \texttt{fc1} is passed through a \textbf{ReLU activation function}.
+        \item ReLU introduces non-linearity into the model by applying the function:
+        \[
+        \text{ReLU}(z) = \max(0, z),
+        \]
+        which ensures that negative values are set to 0, while positive values remain unchanged.
+    \end{itemize}
+\end{itemize}
+\subsection{ReplayMemory}\label{sec:replay_memory}
+It is queue implementation to store the agent's experiences.
+It has a capacity, and when it is full the oldest data is automatically deleted (FIFO policy).
+Offers the methods to insert and get the values from the buffer and a method \textbf{sample()} During training, batches of transitions are sampled randomly from the memory.
+\subsection{FrozenLakeDQN}
+This is the main class responsible for training and testing the agent in the FrozenLake environment.
+It uses the following parameters:
+\subsection{Hyperparameters}
+\begin{itemize}
+    \item \textbf{alpha:} Learning rate for the optimizer (Adam).
+    \item \textbf{gamma:} Discount factor for future rewards.
+    \item \textbf{epsilon:} For epsilon-greedy exploration (the probability of taking a random action).
+    \item \textbf{network\_sync\_rate:} How often to sync the target network with the policy network.
+    \item \textbf{replay\_memory\_size:} Maximum size of the experience replay buffer.
+    \item \textbf{mini\_batch\_size:} Number of experiences sampled for training.
+    \item \textbf{Loss Function and Optimizer:} Initializes the loss function (Mean Squared Error) and optimizer (None initially; later set to Adam).
+\end{itemize}
+\subsection{Train function pseudocode}
+The DQN architecture used in this method is shown in the figure \ref{fig:dqn_architecture}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.99\textwidth]{images/dqn_architecture.drawio.png}
+    \caption{DQN architecture for ForzenLake 4x4}
+    \label{fig:dqn_architecture}
+\end{figure}
+
+\begin{algorithm}[H]
+    \caption{Train method for Deep Q-Network (DQN)}
+    \begin{algorithmic}[1]
+    \State \textbf{Input:} Number of episodes $episodes$, render flag, slippery flag
+    \State Initialize environment $env$ with FrozenLake-v1 (4x4 grid)
+    \State $num\_states \gets$ number of states in environment (16 states for 4x4 grid)
+    \State $num\_actions \gets$ number of actions in environment (4: left, down, right, up)
+    \State Initialize replay memory $memory$ with size $replay\_memory\_size$
+    \State Initialize policy network $policy\_dqn$ with input size $num\_states$ and output size $num\_actions$
+    \State Initialize target network $target\_dqn$ as a copy of $policy\_dqn$
+    \State Initialize optimizer $optimizer$ (Adam for $policy\_dqn$ with learning rate $\alpha$)
+    \State Initialize $rewards\_per\_episode \gets$ zeros array of size $episodes$
+    \State Initialize $epsilon\_history \gets$ empty list
+    \State $step\_count \gets 0$
+    \For{$i = 1$ \textbf{to} $episodes$}
+        \State Reset environment and get initial state $state$
+        \State $terminated \gets$ False, $truncated \gets$ False
+        \While{$terminated$ is False and $truncated$ is False}
+            \If{random() < $\epsilon$}
+                \State Select random action $action$ from $env.action\_space$
+            \Else
+                \State Select best action $action \gets \arg\max Q(state)$ using $policy\_dqn$
+            \EndIf
+            \State Execute action $action$ and observe $new\_state, reward, terminated, truncated$
+            \State Store experience $(state, action, new\_state, reward, terminated)$ in memory
+            \State $state \gets new\_state$
+            \State Increment $step\_count$
+        \EndWhile
+        \If{$reward = 1$}
+            \State $rewards\_per\_episode[i] \gets 1$
+        \EndIf
+        \If{$len(memory) > mini\_batch\_size$}
+            \State Sample a mini-batch from $memory$
+            \State Optimize policy network using the mini-batch
+        \EndIf
+        \State Decay epsilon: $\epsilon \gets \max(\epsilon - \frac{1}{episodes}, 0)$
+        \State Append $\epsilon$ to $epsilon\_history$
+        \If{$step\_count > network\_sync\_rate$}
+            \State Synchronize target network: $target\_dqn.load\_state\_dict(policy\_dqn.state\_dict())$
+            \State Reset $step\_count \gets 0$
+        \EndIf
+    \EndFor
+    \State Close environment
+    \State \textbf{Return} $policy\_dqn, rewards\_per\_episode, epsilon\_history$
+    \end{algorithmic}
+    \end{algorithm}
+\subsection{Optimize method pseudocode}
+\begin{algorithm}[H]
+    \caption{Optimize method for Deep Q-Network (DQN)}
+    \begin{algorithmic}[1]
+    \State \textbf{Input:} mini-batch of experiences, $policy\_dqn$, $target\_dqn$
+    \State Initialize $current\_q\_list \gets$ empty list
+    \State Initialize $target\_q\_list \gets$ empty list
+    \For{each experience $(state, action, new\_state, reward, terminated)$ in mini-batch}
+        \If{$terminated$ is True}
+            \State Set $target \gets reward$
+        \Else
+            \State $target \gets reward + \gamma \cdot \max Q(new\_state)$ using $target\_dqn$
+        \EndIf
+        \State Get $current\_q \gets$ $policy\_dqn(state)$
+        \State Append $current\_q$ to $current\_q\_list$
+        \State Get $target\_q \gets$ $target\_dqn(state)$
+        \State Adjust $target\_q[action] \gets target$
+        \State Append adjusted $target\_q$ to $target\_q\_list$
+    \EndFor
+    \State Compute $loss \gets$ Mean Squared Error between $current\_q\_list$ and $target\_q\_list$
+    \State Zero gradients in $optimizer$
+    \State Perform backpropagation on $loss$
+    \State Update $policy\_dqn$ using the $optimizer$
+    \end{algorithmic}
+    \end{algorithm}
+    
+    The above algorithms help us to solve the Frozen Lake problem and we will try to explain how they work.
+    \subsection{The train method}
+    The train method handles training process of the agent environment.
+    \subsubsection{Initialization}
+    \begin{itemize}
+        \item Environment:
+        \begin{itemize}
+            \item spaces $\leftarrow$ 16
+            \item actions $\leftarrow$ 4
+        \end{itemize}
+        \item Replay Memory to store agent's experiences
+        \item Neural Networks
+        \begin{itemize}
+            \item Policy DQN $\rightarrow$ NN used by agent to select actions based on the current state
+            \item Target DQN $\rightarrow$ A copy of Policy Network used to compute stable Q-values for training.
+        \end{itemize}
+        \item The optimizer (Adam) is used to update the weights of the policy network based on the loss computed during training.
+    \end{itemize}
+    \subsubsection{Main Loop}
+    The loop runs for a specified number of episodes (episodes), and in each episode, the agent interacts with the environment to improve its policy.
+    Each episode starts with the environment being reset, and the agent begins at a specific state until it achieve the goal (or timing terminated) or fall into an hole.
+    The train method uses the epsilon-greedy strategy to balance exploration and exploitation:
+    \begin{itemize}
+        \item $\varepsilon$-greedy:
+        \begin{itemize}
+            \item With probability $\varepsilon$, it selects a random action (exploration)
+            \item With probability $1-\varepsilon$ it selects the best action based on the policy network (exploitation).
+        \end{itemize}
+        \item Experience storage
+        \item The agent stores the current state, action, next state, reward in the replay memory.
+        \item $\varepsilon$-decay Epsilon is decayed over time, which reduces exploration and increases exploitation as training progresses.
+        \item Once enough experiences are stored in memory, a mini-batch of experiences is sampled and passed to the optimize method to update the policy network.
+        \item The parameters of the target network are periodically updated to match the policy network after a certain number of steps.
+         This helps improve stability during training by ensuring that the target Q-values do not change too frequently.
+    \end{itemize}
+    \subsection{The optimize method}
+    This method is responsible for updating the policy network based on the experiences sampled from memory.
+    The Q-value update is based on the Bellman equation:
+    \begin{itemize}
+        \item If the episode is terminated, the Q-value is set to the immediate reward (0 or 1).
+        \item Otherwise, the target Q-value is computed with the Bellman equation.
+        \item Loss: is computed as difference between the current Q-value predicted by the policy network and 
+        the target Q-value computed using the target network
+        \item Backpropagation: the optimize updates the weights of the policy network to minimize the loss
+    \end{itemize}
+    \subsection{State DQN Input conversion}
+    This method converts the state (an integer) into one-hot encoded vector to use as input of DQN
+    For example if the state is 1 and the environement has 16 states, the input tensor will be an array
+    of 16 elements with a 1 at the index 1
+\subsection{Results}
+An interesting comparison could be performed between a Q-Learning agent and a DQN agent.
+To make this comparison we build two environment Frozen Lake one with 16 states, and the second with 64 states.
+\subsection{Comparison in non-determinisitc 4x4 Environment}
+The figures \ref{fig:cumulative_rewards_dqn_vs_q_learning_nd_4x4} and \ref{fig:success_rate_log_dqn_vs_q-learning_nd_4x4} shown the comparison of the learning curve and success rate between the Q-Learning agent and the DQN agent in a non-determinisitc environement
+In the both picture we can see the DQN has better perfomcance in both cases.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.99\textwidth]{images/cumulative_rewards_dqn_vs_q_learning_nd_4x4.png}
+    \caption{Learning curve DQN vs Q-Learning in a non deterministic environement}
+    \label{fig:cumulative_rewards_dqn_vs_q_learning_nd_4x4}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.99\textwidth]{images/success_rate_log_dqn_vs_q-learning_nd_4x4.png}
+    \caption{Success rate DQN vs Q-Learning in a non deterministic environement}
+    \label{fig:success_rate_log_dqn_vs_q-learning_nd_4x4}
+\end{figure}
+
+\section{Conclusion}
+The Frozen Lake problem is as a basic example in RL, providing an environment to explore both traditional Q-learning and DQN. 
+Q-learning, a tabular method, is efficient for environments with discrete and relatively small state-action spaces. 
+With its Q-table allows it to efficiently learn an optimal policy with limited computational overhead. 
+However, it is impractical for problems with large or continuous state spaces, where the Q-table would grow exponentially.
+DQN uses neural networks to approximate Q-values, enabling them to generalize across vast or continuous state spaces. 
+The choice between Q-learning and DQN depends by the environment and the available computational resources. 
+For smaller, well-defined problems like Frozen Lake, Q-learning is often sufficient. 
+However, as environments increase in complexity, DQNs provide a robust framework to tackle challenges that traditional methods cannot handle.

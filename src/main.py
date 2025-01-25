@@ -1,5 +1,5 @@
 from q_learning import FrozenLakeDeterministic, FrozenLakeNonDeterministic
-from plot import heatmap, log_epsilon_analysis, log_gamma_analysis, log_alpha_analysis, learned_policy_deterministic_comparison, plot_cumulative_rewards, success_rate_log
+from plot import heatmap, learned_policy_deterministic_comparison, plot_cumulative_rewards, success_rate_log
 
 from dqn import FrozenLakeDQN
 
@@ -83,59 +83,95 @@ def frozen_lake_deterministic_comparison(iterations):
     plot_cumulative_rewards(categories=categories, values=values, title="Deterministic Frozen Lake (Cumulative Rewards Comparison)", xlabel="Episodes", ylabel="Cumulative Rewards", file_name="cumulative_rewards_deterministic_comparison")
     success_rate_log(categories=categories, values=policy_rewards, title = "Success rate log", xlabel="Episodes", ylabel="Log(wins/episodes)", file_name="success_rate_log")
 
-def frozen_lake_dqn_deterministic_comparison(iterations):
+def frozen_lake_dqn_vs_q_learning(iterations):
     
     categories = []
     values = []
     policy_rewards = []
     
+    fld = FrozenLakeNonDeterministic(epsilon=1, discount_factor=0.98, learning_rate=0.001, render=False, episodes_number=iterations)
+    Q, rewards, policy = fld.training()
     
-    fld = FrozenLakeDQN(discount_factor=0.98)
-    policy, rewards  = fld.train(iterations, False, True)
-    categories.append(f"{gamma_label}={fld.discount_factor}, {alpha_label}={fld.learning_rate}")
+    categories.append(f"Q-Learning Agent {epsilon_label}={fld.epsilon}, {gamma_label}={fld.discount_factor}, {alpha_label}={fld.learning_rate}")
     values.append(rewards)
-    # _, win_counts, _ = fld.run_agent(policy)
-    # policy_rewards.append(win_counts)
-
-    fld = FrozenLakeDQN(discount_factor=0.1)
-    policy, rewards  = fld.train(iterations, False, True)
-    categories.append(f"{gamma_label}={fld.discount_factor}, {alpha_label}={fld.learning_rate}")
-    values.append(rewards)
-    # _, win_counts, _ = fld.run_agent(policy)
-    # policy_rewards.append(win_counts)
     
-    fld = FrozenLakeDQN(discount_factor=0.5)
-    policy, rewards  = fld.train(iterations, False, True)
-    categories.append(f"{gamma_label}={fld.discount_factor}, {alpha_label}={fld.learning_rate}")
+    _, win_counts, _ = fld.run_agent(policy)
+    policy_rewards.append(win_counts)
+    
+    
+    dqn = FrozenLakeDQN(alpha=0.001, gamma = fld.discount_factor, epsilon=fld.epsilon)
+    policyDqn, rewards, _, _  = dqn.train(iterations, False, True, "4x4")
+    categories.append(f"DQN Agent {gamma_label}={fld.discount_factor}, {alpha_label}={fld.learning_rate}")
     values.append(rewards)
-    # _, win_counts, _ = fld.run_agent(policy)
-    # policy_rewards.append(win_counts)
+    _, win_counts, _ = dqn.run_agent(iterations, policyDqn, True, False, "4x4")
+    policy_rewards.append(win_counts)
 
-    plot_cumulative_rewards(categories=categories, values=values, title="Deterministic DQN Frozen Lake (Cumulative Rewards Comparison)", xlabel="Episodes", ylabel="Cumulative Rewards", file_name="cumulative_rewards_deterministic_comparison_dqn")
-    #success_rate_log(categories=categories, values=policy_rewards, title = "Success rate log DQN", xlabel="Episodes", ylabel="Log(wins/episodes)", file_name="success_rate_log_dqn")
+    plot_cumulative_rewards(categories=categories, values=values, title="Cumulative curve DQN vs Q-Learning (Non-determinisitc Environment)", file_name="cumulative_rewards_dqn_vs_q_learning", xlabel="Episodes", ylabel="Cumulative Rewards")
+    success_rate_log(categories=categories, values=policy_rewards, title = "Success rate log DQN vs Q-Learning", xlabel="Episodes", ylabel="Log(wins/episodes)", file_name="success_rate_log_dqn_vs_q_learning")
 
-def frozen_lake_dqn_non_deterministic_comparison(iterations):
-    pass
+def train_and_run_q_learning_deterministic():
+    fld = FrozenLakeDeterministic(epsilon=0.98, discount_factor=0.98, render=False, episodes_number=10000)
+    Q, rewards, policy = fld.training()
+    fld.render = True
+    fld.episodes_number = 10
+    _, win_counts, _ = fld.run_agent(policy)
 
-def frozen_lake_loss_analysis():
-    pass
+def train_and_run_q_learning_non_deterministic():
+    fld = FrozenLakeNonDeterministic(learning_rate = 0.1, epsilon=0.98, discount_factor=0.98, render=False, episodes_number=10000)
+    Q, rewards, policy = fld.training()
+    fld.render = True
+    fld.episodes_number = 10
+    _, win_counts, _ = fld.run_agent(policy)
+
+def train_and_run_dqn_determinisitic():
+    dqn = FrozenLakeDQN()
+    policyDqn, rewards, _, _  = dqn.train(10000, False, False, "4x4")
+    dqn.run_agent(10, policyDqn, False, True, "4x4")
+
+def train_and_run_dqn_non_determinisitic():
+    dqn = FrozenLakeDQN()
+    policyDqn, rewards, _, _  = dqn.train(10000, False, True, "4x4")
+    dqn.run_agent(10, policyDqn, True, True, "4x4")
+
+def show_menu():
+    print("\nMain Menu")
+    print("1. Q-Learning Analysis")
+    print("2. DQN vs Q-Learning Analysis")
+    print("3. Train (10000 episodes) and run (10 episodes) a Q-Learning agent (Deterministic)")
+    print("4. Train (10000 episodes) and run (10 episodes) a Q-Learning agent (Non-Deterministic)")
+    print("5. Train (10000 episodes) and run (10 episodes) a DQN agent (Deterministic)")
+    print("6. Train (10000 episodes) and run (10 episodes) a DQN agent (Non-Deterministic)")
+    print("7. Exit")
 
 def main():
+    while True:
+        show_menu()
+        choice = input("Choose an action (1-7): ")
+        if choice == '1':
+            frozen_lake_non_deterministic_comparison(10000)
+            frozen_lake_deterministic_comparison(10000)
+        elif choice == '2':
+            frozen_lake_dqn_vs_q_learning(10000)
+        elif choice == '3':
+            train_and_run_q_learning_deterministic()
+        elif choice == '4':
+            train_and_run_q_learning_non_deterministic()
+        elif choice == '5':
+            train_and_run_dqn_determinisitic()
+        elif choice == '6':
+            train_and_run_dqn_non_determinisitic()
+        elif choice == '7':
+            exit()
+        else:
+            print("Invalid choice. Please try again.")
+
+        
     
-    
-    #frozen_lake_deterministic_comparison(10500)
-
-    #frozen_lake_non_deterministic_comparison(15000)
-    #frozen_lake_dqn_deterministic_comparison(15000)
-
-    dqn = FrozenLakeDQN()
-    policy, rewards_per_episodes, epsilon =  dqn.train(1000, False, False)
-    print(epsilon)
-    dqn.test(10, policy, False)
+   
 
     
 
-    # print(f"win rate = {100 * fl.run_agent(policy=policy)[0]/fl.episodes_number}")
+   
 
 
 

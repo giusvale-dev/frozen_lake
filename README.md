@@ -1,9 +1,10 @@
 # frozen_lake
-#Install the virtual enviroment
-python 3 -m ven frozen_lake
 
-# Activate the venv
-source bin/activate
+# How to install
+1 - Create a virtual environment ```python -m venv .venv```
+2 - Activate the virtual environment ```source .venv/bin/activate``` 
+3 - Install the required packages ```pip install -r requirements.txt```
 
-#INstall requirements
-pip install requirements.txt
+# Run
+```cd src```
+```python3 main.py```
